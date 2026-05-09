@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة نبض الصف | Class Pulse Dashboard</title>
+    <!-- Tailwind CSS for rapid styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cairo Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #312e81;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --info: #0ea5e9;
+            --warning: #f59e0b;
+            --help: #8b5cf6;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f8fafc;
+            overflow-x: hidden;
+            transition: padding-top 0.3s ease;
+        }
+
+        /* Teacher Mode Sticky Bar Padding */
+        body.teacher-mode {
+            padding-top: 60px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-20px) scale(1.05); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translate(-50%, 50%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            70% { transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+        }
+
+        @keyframes pulse-live {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .fade-in { animation: fadeIn 0.8s ease-out forwards; }
+        .slide-up { animation: slideUp 0.4s ease-out forwards; }
+        .pop-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .shake { animation: shake 0.4s ease-in-out; }
+        
+        .floating-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.6;
+            animation: float 8s infinite ease-in-out;
+            z-index: 0;
+        }
+
+        /* Form Radio Card Styles */
+        .status-radio:checked + .status-card {
+            border-color: currentColor;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-radio[value="understood"]:checked + .status-card { background-color: #ecfdf5; color: var(--success); border-color: var(--success); }
+        .status-radio[value="practice"]:checked + .status-card { background-color: #f0f9ff; color: var(--info); border-color: var(--info); }
+        .status-radio[value="confused"]:checked + .status-card { background-color: #fffbeb; color: var(--warning); border-color: var(--warning); }
+        .status-radio[value="help"]:checked + .status-card { background-color: #f5f3ff; color: var(--help); border-color: var(--help); }
+
+        .progress-gradient { background: linear-gradient(90deg, var(--primary), var(--secondary)); }
+        .hero-gradient { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--secondary) 100%); }
+        
+        .live-dot {
+            width: 12px; height: 12px; border-radius: 50%; background-color: #ef4444;
+            display: inline-block; animation: pulse-live 2s infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-800 relative">
+
+    <!-- Teacher Sticky Top Bar (Hidden by default) -->
+    <div id="teacherStickyBar" class="fixed top-0 left-0 right-0 h-[60px] bg-slate-900 text-white z-50 hidden shadow-lg px-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <span class="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-sm font-bold border border-indigo-500/30">👨‍🏫 وضع المعلم</span>
+            <span class="text-sm text-slate-300 hidden md:inline">لوحة التحكم النشطة</span>
+        </div>
+        <button onclick="logoutTeacher()" class="text-slate-300 hover:text-white hover:bg-slate-800 px-4 py-2 rounded-lg transition-colors text-sm font-semibold flex items-center gap-2">
+            تسجيل الخروج
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        </button>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero-gradient relative text-white py-24 px-6 overflow-hidden">
+        <div class="floating-orb bg-indigo-500 w-96 h-96 top-0 right-[-10%]"></div>
+        <div class="floating-orb bg-purple-500 w-80 h-80 bottom-[-20%] left-[-10%]" style="animation-delay: 2s;"></div>
+        
+        <div class="max-w-4xl mx-auto relative z-10 text-center fade-in">
+            <div class="inline-block bg-white/10 backdrop-blur-md border border-white/20 text-emerald-300 font-semibold px-4 py-1.5 rounded-full mb-6 shadow-xl">
+                ✨ أداة تقييم تفاعلية للفصل الدراسي
+            </div>
+            <h1 class="text-5xl md:text-6xl font-extrabold mb-6 tracking-tight">لوحة نبض الصف</h1>
+            <p class="text-xl md:text-2xl text-indigo-100 mb-10 max-w-2xl mx-auto font-light leading-relaxed">
+                قياس سريع وذكي لفهم الطلاب بعد كل حصة لمساعدتك في اتخاذ قرارات تعليمية أفضل.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="scrollToForm()" class="bg-white text-indigo-700 hover:bg-indigo-50 font-bold py-4 px-8 rounded-2xl shadow-lg shadow-indigo-900/20 transition-all transform hover:-translate-y-1 text-lg">
+                    ابدأ التقييم
+                </button>
+                <button onclick="openLoginModal()" class="bg-transparent border-2 border-white/30 text-white hover:bg-white/10 font-bold py-4 px-8 rounded-2xl transition-all text-lg">
+                    دخول المعلم
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-6 py-12 relative z-10 -mt-10">
+        
+        <!-- SECTION: STUDENT FORM -->
+        <section id="studentFormSection" class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden fade-in">
+            <!-- Progress Bar -->
+            <div class="w-full h-2 bg-slate-100">
+                <div class="h-full progress-gradient w-1/3 transition-all duration-500" id="formProgressBar"></div>
+            </div>
+            
+            <div class="p-8 md:p-12">
+                <div class="text-center mb-10">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2">تقييم نهاية الحصة</h2>
+                    <p class="text-slate-500">شاركنا رأيك بصراحة لمساعدتنا في تحسين التجربة التعليمية.</p>
+                </div>
+
+                <form id="pulseForm" class="space-y-8" onsubmit="handleFormSubmit(event)">
+                    <!-- Step 1: Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" onchange="updateProgress()">
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-slate-700">الاسم <span class="text-red-500">*</span></label>
+                            <input type="text" id="studentName" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-slate-50" placeholder="اسمك الكامل">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-slate-700">الصف / الشعبة <span class="text-red-500">*</span></label>
+                            <input type="text" id="studentClass" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-slate-50" placeholder="مثال: الأول الثانوي أ">
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Understanding Level -->
+                    <div class="space-y-4" onchange="updateProgress()">
+                        <label class="block font-semibold text-slate-700 text-lg">كيف تقيم فهمك لدرس اليوم؟ <span class="text-red-500">*</span></label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <!-- Option 1 -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="understanding" value="understood" required class="sr-only status-radio">
+                                <div class="status-card h-full p-4 border-2 border-slate-100 rounded-2xl flex flex-col items-center text-center gap-3 transition-all duration-200 bg-white hover:bg-slate-50 text-slate-600">
+                                    <span class="text-4xl">✅</span>
+                                    <span class="font-bold">فهمت الدرس جيداً</span>
+                                </div>
+                            </label>
+                            <!-- Option 2 -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="understanding" value="practice" class="sr-only status-radio">
+                                <div class="status-card h-full p-4 border-2 border-slate-100 rounded-2xl flex flex-col items-center text-center gap-3 transition-all duration-200 bg-white hover:bg-slate-50 text-slate-600">
+                                    <span class="text-4xl">📚</span>
+                                    <span class="font-bold">أحتاج تدريب إضافي</span>
+                                </div>
+                            </label>
+                            <!-- Option 3 -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="understanding" value="confused" class="sr-only status-radio">
+                                <div class="status-card h-full p-4 border-2 border-slate-100 rounded-2xl flex flex-col items-center text-center gap-3 transition-all duration-200 bg-white hover:bg-slate-50 text-slate-600">
+                                    <span class="text-4xl">😕</span>
+                                    <span class="font-bold">أشعر بالارتباك</span>
+                                </div>
+                            </label>
+                            <!-- Option 4 -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="understanding" value="help" class="sr-only status-radio">
+                                <div class="status-card h-full p-4 border-2 border-slate-100 rounded-2xl flex flex-col items-center text-center gap-3 transition-all duration-200 bg-white hover:bg-slate-50 text-slate-600">
+                                    <span class="text-4xl">🤝</span>
+                                    <span class="font-bold">أستطيع مساعدة زملائي</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Feedback -->
+                    <div class="space-y-6" onkeyup="updateProgress()">
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-slate-700">ما أهم شيء تعلمته اليوم؟ <span class="text-red-500">*</span></label>
+                            <textarea id="mainLearning" required rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-slate-50 resize-none" placeholder="اكتب فكرة أو مهارتين تعلمتها..."></textarea>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-slate-700">ما السؤال الذي ما زال لديك؟ <span class="text-slate-400 font-normal text-sm">(اختياري)</span></label>
+                            <textarea id="remainingQuestion" rows="2" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-slate-50 resize-none" placeholder="هل هناك جزء غير واضح تود أن أشرحه غداً؟"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" id="submitBtn" class="w-full progress-gradient text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all transform hover:-translate-y-1 flex justify-center items-center gap-2">
+                        <span>إرسال التقييم</span>
+                        <svg class="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                    <p id="formError" class="text-red-500 text-center font-semibold hidden mt-2">الرجاء إكمال جميع الحقول المطلوبة.</p>
+                </form>
+
+                <!-- Success State (Hidden by default) -->
+                <div id="successState" class="hidden text-center py-10">
+                    <div class="text-6xl mb-6 pop-in inline-block">🎉</div>
+                    <h3 class="text-3xl font-bold text-slate-800 mb-2">تم الإرسال بنجاح!</h3>
+                    <p class="text-lg text-slate-600 mb-8">شكراً لك، رأيك يساعدنا في تقديم الأفضل.</p>
+                    <button onclick="resetForm()" class="text-indigo-600 font-semibold hover:text-indigo-800 underline">إرسال تقييم طالب آخر</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: TEACHER DASHBOARD (HIDDEN) -->
+        <section id="teacherDashboard" class="hidden space-y-8 fade-in">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
+                <div>
+                    <h2 class="text-3xl font-bold text-slate-800 mb-1">ملخص استجابات الطلاب</h2>
+                    <p class="text-slate-500">البيانات تُحدث تلقائياً. أحدث قراءة لحالة الفصل.</p>
+                </div>
+                <div class="flex gap-3">
+                    <div class="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 border border-red-100">
+                        <span class="live-dot"></span> مباشر (Firebase)
+                    </div>
+                    <button onclick="fetchLatestData()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 p-2 rounded-xl transition-colors shadow-sm" title="تحديث يدوي">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Smart AI Recommendation -->
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-6 flex items-start gap-4 shadow-sm relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 text-8xl opacity-5">🧠</div>
+                <div class="bg-indigo-100 p-3 rounded-xl shrink-0">
+                    <span class="text-2xl">🤖</span>
+                </div>
+                <div>
+                    <h3 class="font-bold text-indigo-900 mb-1 flex items-center gap-2">
+                        توصية ذكية <span class="bg-indigo-200 text-indigo-800 text-xs px-2 py-0.5 rounded uppercase tracking-wider">AI</span>
+                    </h3>
+                    <p id="aiRecommendation" class="text-indigo-800 font-medium text-lg">جارِ تحليل البيانات...</p>
+                </div>
+            </div>
+
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <!-- Total -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
+                    <p class="text-slate-500 text-sm font-semibold mb-1">إجمالي التقييمات</p>
+                    <div class="flex items-end justify-between">
+                        <span id="statTotal" class="text-4xl font-extrabold text-slate-800">0</span>
+                        <span class="text-2xl opacity-50 group-hover:scale-110 transition-transform">📊</span>
+                    </div>
+                </div>
+                
+                <!-- Understood -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-emerald-500"></div>
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-slate-500 text-sm font-semibold">فهم جيداً</p>
+                        <span id="pctUnderstood" class="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">0%</span>
+                    </div>
+                    <div class="flex items-end justify-between mb-3">
+                        <span id="statUnderstood" class="text-3xl font-extrabold text-slate-800">0</span>
+                        <span class="text-2xl opacity-50 group-hover:scale-110 transition-transform">✅</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div id="barUnderstood" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Practice -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-sky-500"></div>
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-slate-500 text-sm font-semibold">يحتاج تدريب</p>
+                        <span id="pctPractice" class="text-xs font-bold bg-sky-100 text-sky-700 px-2 py-1 rounded-md">0%</span>
+                    </div>
+                    <div class="flex items-end justify-between mb-3">
+                        <span id="statPractice" class="text-3xl font-extrabold text-slate-800">0</span>
+                        <span class="text-2xl opacity-50 group-hover:scale-110 transition-transform">📚</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div id="barPractice" class="bg-sky-500 h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Confused -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-slate-500 text-sm font-semibold">مرتبك</p>
+                        <span id="pctConfused" class="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-md">0%</span>
+                    </div>
+                    <div class="flex items-end justify-between mb-3">
+                        <span id="statConfused" class="text-3xl font-extrabold text-slate-800">0</span>
+                        <span class="text-2xl opacity-50 group-hover:scale-110 transition-transform">😕</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div id="barConfused" class="bg-amber-500 h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Help -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-2 h-full bg-violet-500"></div>
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-slate-500 text-sm font-semibold">يستطيع المساعدة</p>
+                        <span id="pctHelp" class="text-xs font-bold bg-violet-100 text-violet-700 px-2 py-1 rounded-md">0%</span>
+                    </div>
+                    <div class="flex items-end justify-between mb-3">
+                        <span id="statHelp" class="text-3xl font-extrabold text-slate-800">0</span>
+                        <span class="text-2xl opacity-50 group-hover:scale-110 transition-transform">🤝</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div id="barHelp" class="bg-violet-500 h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Responses List -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h3 class="font-bold text-slate-800 text-lg">أحدث الردود 📝</h3>
+                    <span class="text-sm text-slate-500" id="lastUpdateTime">آخر تحديث: الآن</span>
+                </div>
+                <div class="divide-y divide-slate-100 max-h-[600px] overflow-y-auto" id="responsesListContainer">
+                    <!-- Cards injected via JS -->
+                    <div class="p-8 text-center text-slate-400">لا توجد بيانات للعرض حالياً</div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-10 text-center border-t border-slate-800 mt-12 relative z-10">
+        <div class="max-w-4xl mx-auto px-6">
+            <h4 class="text-white text-xl font-bold mb-2">لوحة نبض الصف</h4>
+            <p class="mb-6">أداة تقييم تفاعلية لتعزيز الفهم داخل الفصول الدراسية.</p>
+            <div class="flex justify-center items-center gap-3 text-sm font-mono bg-slate-800 inline-flex px-4 py-2 rounded-lg border border-slate-700">
+                <span class="text-emerald-400">AI</span>
+                <span class="text-slate-500">→</span>
+                <span class="text-sky-400">Code</span>
+                <span class="text-slate-500">→</span>
+                <span class="text-white">GitHub</span>
+                <span class="text-slate-500">→</span>
+                <span class="text-indigo-400">Pages</span>
+                <span class="text-slate-500">→</span>
+                <span class="text-amber-400">Data</span>
+            </div>
+            <p class="mt-8 text-xs text-slate-500">© 2026 جميع الحقوق محفوظة.</p>
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative transform scale-95 opacity-0 transition-all duration-300" id="loginModalInner">
+            <button onclick="closeLoginModal()" class="absolute top-4 left-4 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🔐</div>
+                <h3 class="text-2xl font-bold text-slate-800">دخول المعلم</h3>
+                <p class="text-slate-500 text-sm mt-1">الرجاء إدخال كلمة المرور للوصول إلى لوحة التحكم.</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <input type="password" id="teacherPassword" class="w-full px-4 py-3 text-center tracking-widest rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all text-lg" placeholder="••••••••" onkeyup="if(event.key === 'Enter') attemptLogin()">
+                </div>
+                <p id="loginError" class="text-red-500 text-sm text-center font-semibold hidden">كلمة المرور غير صحيحة!</p>
+                <button onclick="attemptLogin()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">
+                    تسجيل الدخول
+                </button>
+                <p class="text-center text-xs text-slate-400 mt-4">تلميح للتجربة: teacher123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        /**
+         * Backend Configuration
+         * Modify these variables to connect to actual cloud services.
+         */
+        const BACKEND_URL = ''; // e.g. Google Apps Script Web App URL
+        const SECRET_TOKEN = 'pulse2025';
+        const FIREBASE_URL = ''; // e.g. https://your-app.firebaseio.com/responses
+        
+        // Local State
+        let responses = [];
+        let isTeacher = false;
+        let pollInterval = null;
+
+        // Constants mapping
+        const statusConfig = {
+            'understood': { label: 'فهم جيداً', color: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200', emoji: '✅' },
+            'practice': { label: 'يحتاج تدريب', color: 'bg-sky-100 text-sky-700', border: 'border-sky-200', emoji: '📚' },
+            'confused': { label: 'مرتبك', color: 'bg-amber-100 text-amber-700', border: 'border-amber-200', emoji: '😕' },
+            'help': { label: 'يستطيع المساعدة', color: 'bg-violet-100 text-violet-700', border: 'border-violet-200', emoji: '🤝' }
+        };
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load responses from LocalStorage as fallback/base
+            const saved = localStorage.getItem('pulse_responses');
+            if (saved) {
+                responses = JSON.parse(saved);
+            }
+
+            // Check Auth state
+            isTeacher = sessionStorage.getItem('isTeacher') === 'true';
+            if (isTeacher) {
+                enableTeacherMode();
+            }
+
+            updateProgress();
+        });
+
+        // ----------------- FORM LOGIC ----------------- //
+
+        function updateProgress() {
+            let progress = 0;
+            const name = document.getElementById('studentName').value;
+            const sclass = document.getElementById('studentClass').value;
+            const radio = document.querySelector('input[name="understanding"]:checked');
+            const learning = document.getElementById('mainLearning').value;
+
+            if (name || sclass) progress += 33;
+            if (radio) progress += 33;
+            if (learning) progress += 34;
+
+            document.getElementById('formProgressBar').style.width = `${progress}%`;
+        }
+
+        function scrollToForm() {
+            document.getElementById('studentFormSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submitBtn');
+            const errorTxt = document.getElementById('formError');
+            
+            // Collect data
+            const payload = {
+                id: 'res_' + Date.now() + Math.floor(Math.random()*1000),
+                name: document.getElementById('studentName').value.trim(),
+                studentClass: document.getElementById('studentClass').value.trim(),
+                understanding: document.querySelector('input[name="understanding"]:checked')?.value,
+                mainLearning: document.getElementById('mainLearning').value.trim(),
+                remainingQuestion: document.getElementById('remainingQuestion').value.trim() || null,
+                timestamp: new Date().toISOString()
+            };
+
+            // Simple validation
+            if (!payload.name || !payload.studentClass || !payload.understanding || !payload.mainLearning) {
+                errorTxt.classList.remove('hidden');
+                return;
+            }
+            errorTxt.classList.add('hidden');
+
+            // UI Loading state
+            btn.innerHTML = '<span class="animate-spin text-xl">⏳</span> جاري الإرسال...';
+            btn.disabled = true;
+
+            // Save Locally
+            responses.push(payload);
+            localStorage.setItem('pulse_responses', JSON.stringify(responses));
+
+            // Async external requests (Fire and forget style for seamless UX)
+            sendDataExternal(payload);
+
+            // Simulate slight delay for UX
+            setTimeout(() => {
+                document.getElementById('pulseForm').classList.add('hidden');
+                document.getElementById('successState').classList.remove('hidden');
+                document.getElementById('formProgressBar').style.width = '100%';
+                
+                if (isTeacher) {
+                    updateDashboard();
+                }
+            }, 600);
+        }
+
+        function resetForm() {
+            document.getElementById('pulseForm').reset();
+            document.getElementById('pulseForm').classList.remove('hidden');
+            document.getElementById('successState').classList.add('hidden');
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.innerHTML = `<span>إرسال التقييم</span> <svg class="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
+            
+            updateProgress();
+        }
+
+        async function sendDataExternal(data) {
+            // 1. Google Sheets via fetch
+            if (BACKEND_URL) {
+                try {
+                    // Adding Secret Token to payload
+                    const sheetsPayload = { ...data, token: SECRET_TOKEN };
+                    fetch(BACKEND_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // standard for GAS
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sheetsPayload)
+                    }).catch(err => console.log('GAS Error (ignored in no-cors):', err));
+                } catch(e) {}
+            }
+
+            // 2. Firebase RTDB via REST API
+            if (FIREBASE_URL) {
+                try {
+                    fetch(`${FIREBASE_URL}.json`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    }).catch(err => console.log('Firebase Error:', err));
+                } catch(e) {}
+            }
+        }
+
+        // ----------------- AUTH LOGIC ----------------- //
+
+        function openLoginModal() {
+            const modal = document.getElementById('loginModal');
+            const inner = document.getElementById('loginModalInner');
+            document.getElementById('teacherPassword').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+            
+            modal.classList.remove('hidden');
+            // Trigger animation
+            setTimeout(() => {
+                inner.classList.remove('scale-95', 'opacity-0');
+                inner.classList.add('scale-100', 'opacity-100');
+                document.getElementById('teacherPassword').focus();
+            }, 10);
+        }
+
+        function closeLoginModal() {
+            const modal = document.getElementById('loginModal');
+            const inner = document.getElementById('loginModalInner');
+            
+            inner.classList.remove('scale-100', 'opacity-100');
+            inner.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        function attemptLogin() {
+            const pwd = document.getElementById('teacherPassword').value;
+            const inner = document.getElementById('loginModalInner');
+            const err = document.getElementById('loginError');
+
+            if (pwd === 'teacher123') {
+                sessionStorage.setItem('isTeacher', 'true');
+                isTeacher = true;
+                closeLoginModal();
+                enableTeacherMode();
+            } else {
+                err.classList.remove('hidden');
+                // Shake animation
+                inner.classList.remove('shake');
+                void inner.offsetWidth; // trigger reflow
+                inner.classList.add('shake');
+            }
+        }
+
+        function enableTeacherMode() {
+            document.body.classList.add('teacher-mode');
+            document.getElementById('teacherStickyBar').classList.remove('hidden');
+            document.getElementById('studentFormSection').classList.add('hidden');
+            document.getElementById('teacherDashboard').classList.remove('hidden');
+            
+            updateDashboard();
+            startAutoPolling();
+        }
+
+        function logoutTeacher() {
+            sessionStorage.removeItem('isTeacher');
+            isTeacher = false;
+            document.body.classList.remove('teacher-mode');
+            document.getElementById('teacherStickyBar').classList.add('hidden');
+            document.getElementById('teacherDashboard').classList.add('hidden');
+            document.getElementById('studentFormSection').classList.remove('hidden');
+            stopAutoPolling();
+        }
+
+        // ----------------- DASHBOARD LOGIC ----------------- //
+
+        function updateDashboard() {
+            // Count metrics
+            const total = responses.length;
+            const counts = { understood: 0, practice: 0, confused: 0, help: 0 };
+            
+            responses.forEach(r => {
+                if (counts[r.understanding] !== undefined) {
+                    counts[r.understanding]++;
+                }
+            });
+
+            // Update Counters with animation
+            animateValue('statTotal', total);
+            animateValue('statUnderstood', counts.understood);
+            animateValue('statPractice', counts.practice);
+            animateValue('statConfused', counts.confused);
+            animateValue('statHelp', counts.help);
+
+            // Update Progress Bars & Percentages
+            const calcPct = (val) => total === 0 ? 0 : Math.round((val / total) * 100);
+            
+            const updateBar = (id, pct) => {
+                document.getElementById(`pct${id}`).innerText = `${pct}%`;
+                document.getElementById(`bar${id}`).style.width = `${pct}%`;
+            };
+
+            updateBar('Understood', calcPct(counts.understood));
+            updateBar('Practice', calcPct(counts.practice));
+            updateBar('Confused', calcPct(counts.confused));
+            updateBar('Help', calcPct(counts.help));
+
+            // Smart AI Recommendation
+            updateAIRecommendation(counts, total);
+
+            // Render List
+            renderResponsesList();
+            
+            // Update time
+            const now = new Date();
+            document.getElementById('lastUpdateTime').innerText = `آخر تحديث: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function updateAIRecommendation(counts, total) {
+            const aiText = document.getElementById('aiRecommendation');
+            if (total === 0) {
+                aiText.innerText = "لم يتم إرسال أي تقييم بعد. في انتظار استجابات الطلاب.";
+                return;
+            }
+
+            // Find dominant emotion/status
+            let dominant = 'understood';
+            let max = counts.understood;
+
+            for (const key in counts) {
+                if (counts[key] > max) {
+                    max = counts[key];
+                    dominant = key;
+                }
+            }
+
+            // Tie-breaker logic or percentage threshold could go here, keeping it simple:
+            if (dominant === 'understood') {
+                aiText.innerText = "يبدو أن معظم الطلاب فهموا الدرس بوضوح. ممتاز! يمكنك الانتقال إلى نشاط تطبيقي متقدم في الحصة القادمة.";
+            } else if (dominant === 'practice') {
+                aiText.innerText = "هناك حاجة ملحوظة للتدريب. يُنصح ببدء الحصة القادمة بمراجعة قصيرة وحل أمثلة إضافية معاً.";
+            } else if (dominant === 'confused') {
+                aiText.innerText = "نسبة الارتباك مرتفعة. من الضروري إعادة شرح المفهوم الأساسي باستخدام مثال أبسط أو طريقة مختلفة قبل التقدم في المنهج.";
+            } else if (dominant === 'help') {
+                aiText.innerText = "مستوى ثقة عالٍ بين الطلاب! استثمر ذلك في استخدام استراتيجية التعلم التعاوني ودع الطلاب يشرحون لبعضهم.";
+            }
+        }
+
+        // XSS Safe Element Creation
+        function createEl(tag, className, textContent = '') {
+            const el = document.createElement(tag);
+            if (className) el.className = className;
+            if (textContent) el.textContent = textContent;
+            return el;
+        }
+
+        function renderResponsesList() {
+            const container = document.getElementById('responsesListContainer');
+            container.innerHTML = ''; // Clear
+
+            if (responses.length === 0) {
+                container.appendChild(createEl('div', 'p-8 text-center text-slate-400 font-medium', 'لا توجد بيانات للعرض حالياً'));
+                return;
+            }
+
+            // Reverse to show newest first
+            const sorted = [...responses].reverse();
+
+            sorted.forEach(item => {
+                const conf = statusConfig[item.understanding] || statusConfig['understood'];
+                
+                const card = createEl('div', 'p-5 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row gap-4 items-start');
+                
+                // Avatar
+                const initial = item.name.charAt(0) || '?';
+                const avatar = createEl('div', `w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shrink-0 ${conf.color}`);
+                avatar.textContent = initial;
+                
+                // Content wrapper
+                const content = createEl('div', 'flex-1 space-y-2 w-full');
+                
+                // Header (Name + Class + Badge + Time)
+                const headerWrap = createEl('div', 'flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2');
+                
+                const nameWrap = createEl('div', 'flex items-center gap-2 flex-wrap');
+                nameWrap.appendChild(createEl('h4', 'font-bold text-slate-800 text-lg', item.name));
+                nameWrap.appendChild(createEl('span', 'text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200', item.studentClass));
+                
+                const badgeWrap = createEl('div', 'flex items-center gap-3');
+                const badge = createEl('span', `text-xs font-bold px-2.5 py-1 rounded-full border ${conf.color} ${conf.border}`);
+                badge.innerHTML = `${conf.emoji} ${conf.label}`;
+                
+                // Format Date
+                let timeStr = 'الآن';
+                if (item.timestamp) {
+                    const d = new Date(item.timestamp);
+                    timeStr = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                }
+                const timeEl = createEl('span', 'text-xs text-slate-400 whitespace-nowrap', timeStr);
+                
+                badgeWrap.appendChild(badge);
+                badgeWrap.appendChild(timeEl);
+                
+                headerWrap.appendChild(nameWrap);
+                headerWrap.appendChild(badgeWrap);
+                
+                // Text data
+                const textWrap = createEl('div', 'bg-white border border-slate-100 rounded-xl p-3 shadow-sm space-y-2');
+                
+                const learnLabel = createEl('div', 'text-xs text-slate-400 font-semibold mb-1', 'ماذا تعلم:');
+                const learnText = createEl('p', 'text-slate-700 text-sm leading-relaxed', item.mainLearning);
+                textWrap.appendChild(learnLabel);
+                textWrap.appendChild(learnText);
+                
+                if (item.remainingQuestion) {
+                    const qLine = createEl('div', 'border-t border-slate-50 pt-2 mt-2');
+                    const qLabel = createEl('div', 'text-xs text-indigo-400 font-semibold mb-1', 'سؤال متبقي:');
+                    const qText = createEl('p', 'text-indigo-900 font-medium text-sm', item.remainingQuestion);
+                    qLine.appendChild(qLabel);
+                    qLine.appendChild(qText);
+                    textWrap.appendChild(qLine);
+                }
+
+                content.appendChild(headerWrap);
+                content.appendChild(textWrap);
+                
+                card.appendChild(avatar);
+                card.appendChild(content);
+                
+                container.appendChild(card);
+            });
+        }
+
+        // --- Animations & External Data --- //
+
+        function animateValue(id, end) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            const start = parseInt(obj.innerText) || 0;
+            if (start === end) return;
+            
+            const duration = 800;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Easing out cubic
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                obj.innerText = Math.floor(easeOut * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerText = end;
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        async function fetchLatestData() {
+            // Simulated fetch if FIREBASE_URL is empty
+            if (!FIREBASE_URL) {
+                // Flash the update time to show action occurred
+                const timeEl = document.getElementById('lastUpdateTime');
+                timeEl.style.color = '#10b981'; // green flash
+                setTimeout(() => timeEl.style.color = '', 500);
+                updateDashboard();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${FIREBASE_URL}.json`);
+                if (!res.ok) throw new Error('Network error');
+                const data = await res.json();
+                
+                if (data) {
+                    // Convert Firebase object to array
+                    const remoteResponses = Object.values(data);
+                    
+                    // Basic merge: Update local responses if remote has more/different data
+                    // For a real app, you'd compare IDs. For this demo, overwrite.
+                    responses = remoteResponses;
+                    localStorage.setItem('pulse_responses', JSON.stringify(responses));
+                    updateDashboard();
+                }
+            } catch (err) {
+                console.log('Poll failed, using local data', err);
+            }
+        }
+
+        function startAutoPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            // Poll every 10 seconds (10000 ms)
+            pollInterval = setInterval(() => {
+                if (isTeacher) fetchLatestData();
+            }, 10000);
+        }
+
+        function stopAutoPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+    </script>
+</body>
+</html>
