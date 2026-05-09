@@ -522,18 +522,6 @@
             }, 600);
         }
 
-        function resetForm() {
-            document.getElementById('pulseForm').reset();
-            document.getElementById('pulseForm').classList.remove('hidden');
-            document.getElementById('successState').classList.add('hidden');
-            
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = false;
-            btn.innerHTML = `<span>إرسال التقييم</span> <svg class="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
-            
-            updateProgress();
-        }
-
         async function sendDataExternal(data) {
             // 1. Google Sheets via fetch
             if (BACKEND_URL) {
@@ -542,10 +530,13 @@
                     const sheetsPayload = { ...data, token: SECRET_TOKEN };
                     fetch(BACKEND_URL, {
                         method: 'POST',
-                        mode: 'no-cors', // standard for GAS
-                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'no-cors', // standard for GAS to bypass CORS block
+                        headers: {
+                            // Using text/plain prevents the browser from blocking the request via preflight
+                            'Content-Type': 'text/plain;charset=utf-8',
+                        },
                         body: JSON.stringify(sheetsPayload)
-                    }).catch(err => console.log('GAS Error (ignored in no-cors):', err));
+                    }).catch(err => console.log('GAS Error:', err));
                 } catch(e) {}
             }
 
@@ -559,6 +550,18 @@
                     }).catch(err => console.log('Firebase Error:', err));
                 } catch(e) {}
             }
+        }
+
+        function resetForm() {
+            document.getElementById('pulseForm').reset();
+            document.getElementById('pulseForm').classList.remove('hidden');
+            document.getElementById('successState').classList.add('hidden');
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = false;
+            btn.innerHTML = `<span>إرسال التقييم</span> <svg class="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
+            
+            updateProgress();
         }
 
         // ----------------- AUTH LOGIC ----------------- //
